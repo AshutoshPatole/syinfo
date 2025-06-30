@@ -225,6 +225,142 @@ main() {
     print_subsection "2.8 Disk Space Usage by Directory"
     run_command "du -h --max-depth=1 / 2>/dev/null | sort -hr" true "Disk Usage in / (top level directories)" || \
         echo "Could not calculate disk usage (requires root for some directories)"
+    
+    # Section 3: Network Information
+    print_header "3. NETWORK INFORMATION"
+    
+    # 3.1 Network Interfaces
+    print_subsection "3.1 Network Interfaces"
+    if command -v ip &> /dev/null; then
+        run_command "ip -4 -o addr" false "IPv4 Addresses"
+        run_command "ip -6 -o addr" false "IPv6 Addresses"
+        run_command "ip -s link" false "Network Interface Statistics"
+    else
+        run_command "ifconfig -a" false "Network Interfaces (ifconfig)"
+    fi
+    
+    # 3.2 Routing Information
+    print_subsection "3.2 Routing Information"
+    if command -v ip &> /dev/null; then
+        run_command "ip route" false "IP Routing Table"
+        run_command "ip -6 route" false "IPv6 Routing Table"
+    else
+        run_command "route -n" false "Routing Table (route -n)"
+        run_command "route -6 -n" false "IPv6 Routing Table"
+    fi
+    run_command "netstat -rn" false "Routing Table (netstat -rn)"
+    
+    # 3.3 Network Connections
+    print_subsection "3.3 Network Connections"
+    if command -v ss &> /dev/null; then
+        run_command "ss -tulnp" false "Listening Sockets (ss)"
+        run_command "ss -tan" false "All TCP Connections (ss)"
+        run_command "ss -uan" false "All UDP Connections (ss)"
+        run_command "ss -s" false "Socket Statistics (ss)"
+    else
+        run_command "netstat -tulnp" false "Listening Sockets (netstat)"
+        run_command "netstat -tan" false "All TCP Connections (netstat)"
+        run_command "netstat -uan" false "All UDP Connections (netstat)"
+        run_command "netstat -s" false "Network Statistics (netstat)"
+    fi
+    
+    # 3.4 DNS Configuration
+    print_subsection "3.4 DNS Configuration"
+    if [ -f "/etc/resolv.conf" ]; then
+        get_file_content "/etc/resolv.conf"
+    else
+        echo "/etc/resolv.conf not found"
+    fi
+    
+    if [ -f "/etc/hosts" ]; then
+        get_file_content "/etc/hosts"
+    else
+        echo "/etc/hosts not found"
+    fi
+    
+    if [ -f "/etc/nsswitch.conf" ]; then
+        get_file_content "/etc/nsswitch.conf"
+    fi
+    
+    run_command "cat /etc/hostname 2>/dev/null || hostname" false "Hostname Configuration"
+    
+    # 3.5 Network Time Synchronization
+    print_subsection "3.5 Network Time Synchronization"
+    if command -v timedatectl &> /dev/null; then
+        run_command "timedatectl status" false "Time and Date Status"
+    fi
+    
+    if systemctl is-active --quiet chronyd || systemctl is-active --quiet ntpd; then
+        run_command "chronyc tracking 2>/dev/null || ntpq -p 2>/dev/null || ntpstat" false "NTP Status"
+    else
+        echo "No active NTP service detected"
+    fi
+    
+    # 3.6 Network Manager Configuration
+    print_subsection "3.6 Network Manager Configuration"
+    if command -v nmcli &> /dev/null; then
+        run_command "nmcli general status" false "NetworkManager General Status"
+        run_command "nmcli connection show" false "NetworkManager Connections"
+        run_command "nmcli device status" false "NetworkManager Devices"
+    fi
+    
+    # 3.7 Firewall Status
+    print_subsection "3.7 Firewall Status"
+    if command -v ufw &> /dev/null; then
+        run_command "ufw status verbose" true "UFW Firewall Status"
+    elif command -v firewall-cmd &> /dev/null; then
+        run_command "firewall-cmd --state" true "Firewalld State"
+        run_command "firewall-cmd --list-all" true "Firewalld Configuration"
+    fi
+    
+    # 3.8 IPTables Rules (if available)
+    print_subsection "3.8 IPTables Rules"
+    if command -v iptables &> /dev/null; then
+        run_command "iptables -L -n -v --line-numbers" true "IPv4 Firewall Rules"
+        run_command "iptables -t nat -L -n -v --line-numbers" true "IPv4 NAT Rules"
+        run_command "iptables -t mangle -L -n -v --line-numbers" true "IPv4 Mangle Table"
+        
+        if command -v ip6tables &> /dev/null; then
+            run_command "ip6tables -L -n -v --line-numbers" true "IPv6 Firewall Rules"
+        fi
+    else
+        echo "iptables not available"
+    fi
+    
+    # 3.9 Network Interface Bonding (if configured)
+    print_subsection "3.9 Network Bonding"
+    if [ -d "/proc/net/bonding" ]; then
+        for bond in /proc/net/bonding/bond*; do
+            if [ -f "$bond" ]; then
+                run_command "cat $bond" false "Bond Interface: $(basename $bond)"
+            fi
+        done
+    else
+        echo "No bonding interfaces detected"
+    fi
+    
+    # 3.10 Network Bridge Configuration
+    print_subsection "3.10 Network Bridge Configuration"
+    if command -v brctl &> /dev/null; then
+        run_command "brctl show" false "Bridge Information"
+    fi
+    
+    # 3.11 Network Tuning Parameters
+    print_subsection "3.11 Network Tuning Parameters"
+    run_command "sysctl -a 2>/dev/null | grep -E 'net\.ipv4\.|net\.ipv6\.|net\.core\.|net\.filter\.' | sort" false "Network Kernel Parameters"
+    
+    # 3.12 Network Statistics
+    print_subsection "3.12 Network Statistics"
+    run_command "netstat -i" false "Network Interface Table"
+    run_command "netstat -s" false "Network Statistics"
+    
+    if [ -f "/proc/net/dev" ]; then
+        run_command "cat /proc/net/dev" false "Network Device Statistics"
+    fi
+    
+    if [ -f "/proc/net/snmp" ]; then
+        run_command "cat /proc/net/snmp" false "IP, ICMP, TCP, and UDP Statistics"
+    fi
 }
 
 # Execute main function

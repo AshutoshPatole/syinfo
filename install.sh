@@ -87,17 +87,19 @@ install_dependencies() {
 # Function to download the script
 download_script() {
     local temp_file
+    # Use mktemp to create a secure temporary file
     temp_file=$(mktemp 2>/dev/null || mktemp -t 'sysinfo')
     
     if [ -z "$temp_file" ] || [ ! -f "$temp_file" ]; then
-        print_message "${COLOR_RED}" "Failed to create temporary file"
+        print_message "${COLOR_RED}" "Failed to create temporary file" >&2
         return 1
     fi
     
-    # Clean up temp file on exit
+    # Clean up temp file if the script exits prematurely
     trap 'rm -f "$temp_file"' EXIT
     
-    print_message "${COLOR_BLUE}" "Downloading ${SCRIPT_NAME}..."
+    # Redirect this message to stderr
+    print_message "${COLOR_BLUE}" "Downloading ${SCRIPT_NAME}..." >&2
     
     local download_success=false
     
@@ -110,28 +112,28 @@ download_script() {
             download_success=true
         fi
     else
-        print_message "${COLOR_RED}" "Neither curl nor wget is available. Please install one of them and try again."
+        print_message "${COLOR_RED}" "Neither curl nor wget is available. Please install one of them and try again." >&2
         return 1
     fi
     
     if [ "$download_success" != true ]; then
-        print_message "${COLOR_RED}" "Failed to download ${SCRIPT_NAME}"
+        print_message "${COLOR_RED}" "Failed to download ${SCRIPT_NAME}" >&2
         return 1
     fi
     
     # Verify the downloaded script
     if [ ! -s "$temp_file" ]; then
-        print_message "${COLOR_RED}" "Downloaded file is empty"
+        print_message "${COLOR_RED}" "Downloaded file is empty" >&2
         return 1
     fi
     
     # Check if the file starts with a shebang
     if ! head -n 1 "$temp_file" | grep -q '^#!/bin/bash'; then
-        print_message "${COLOR_RED}" "Downloaded file doesn't appear to be a valid shell script"
+        print_message "${COLOR_RED}" "Downloaded file doesn't appear to be a valid shell script" >&2
         return 1
     fi
     
-    # Remove the trap as we're returning the temp file path
+    # Remove the trap as we're returning the temp file path, and install_script will clean it up
     trap - EXIT
     echo "$temp_file"
     return 0

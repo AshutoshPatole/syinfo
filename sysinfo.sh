@@ -433,17 +433,8 @@ main() {
     run_command "lsof -i -P -n | head -n 20" true "Open Network Connections and Files (top 20)" || \
         echo "lsof not available or requires elevated privileges"
     
-    # 5.3 System Call Statistics
-    print_subsection "5.3 System Call Statistics"
-    if command -v strace &> /dev/null; then
-        run_command "strace -c -f -S name -p 1 2>&1 | head -n 20" true "System Calls by PID 1 (requires root)" || \
-            echo "strace not available or requires root privileges"
-    else
-        echo "strace not installed. Install with 'apt install strace' or 'yum install strace'"
-    fi
-    
-    # 5.4 Process Limits and Capabilities
-    print_subsection "5.4 Process Limits and Capabilities"
+    # 5.3 Process Limits and Capabilities
+    print_subsection "5.3 Process Limits and Capabilities"
     run_command "ulimit -a" false "Current User Process Limits"
     
     if command -v getcap &> /dev/null; then
@@ -453,24 +444,24 @@ main() {
         echo "getcap not available. Install with 'apt install libcap2-bin' or 'yum install libcap-ng-utils'"
     fi
     
-    # 5.5 System Performance Metrics
-    print_subsection "5.5 System Performance Metrics"
+    # 5.4 System Performance Metrics
+    print_subsection "5.4 System Performance Metrics"
     run_command "vmstat 1 3" false "Virtual Memory Statistics"
     run_command "mpstat -P ALL 1 3" false "CPU Statistics (3 samples)" || \
         echo "mpstat not available (part of sysstat package)"
     run_command "iostat -xz 1 3" false "Extended I/O Statistics (3 samples)" || \
         echo "iostat not available (part of sysstat package)"
     
-    # 5.6 System Logs for Performance Issues
-    print_subsection "5.6 Performance-related System Logs"
+    # 5.5 System Logs for Performance Issues
+    print_subsection "5.5 Performance-related System Logs"
     if [ -f "/var/log/kern.log" ]; then
         run_command "grep -i -E 'error|warn|fail|oom|throttl|latency|timeout' /var/log/kern.log | tail -n 20" true "Recent Kernel Log Entries"
     elif [ -f "/var/log/messages" ]; then
         run_command "grep -i -E 'error|warn|fail|oom|throttl|latency|timeout' /var/log/messages | tail -n 20" true "Recent System Messages"
     fi
     
-    # 5.7 Systemd Service Status
-    print_subsection "5.7 Systemd Service Status"
+    # 5.6 Systemd Service Status
+    print_subsection "5.6 Systemd Service Status"
     if command -v systemctl &> /dev/null; then
         run_command "systemctl list-units --type=service --state=failed" false "Failed System Services"
         run_command "systemctl list-timers --all" false "Systemd Timers"
@@ -478,12 +469,12 @@ main() {
         run_command "systemd-analyze critical-chain" true "Critical Startup Chain"
     fi
     
-    # 5.8 Process Environment
-    print_subsection "5.8 Process Environment"
+    # 5.6 Process Environment
+    print_subsection "5.6 Process Environment"
     run_command "env | sort" false "Current Environment Variables"
     
-    # 5.9 System Resource Usage Summary
-    print_subsection "5.9 System Resource Usage Summary"
+    # 5.7 System Resource Usage Summary
+    print_subsection "5.7 System Resource Usage Summary"
     run_command "top -b -n 1 | head -n 20" false "System Resource Usage (top)"
     
     if command -v htop &> /dev/null; then

@@ -415,6 +415,87 @@ main() {
     run_command "ps -eo pcpu,pmem,pid,user,args | sort -k 1 -r | head -n 10" false "Top 10 Processes by CPU and Memory"
     run_command "df -h" false "Filesystem Disk Space Usage"
     run_command "du -sh /var/log/ 2>/dev/null || echo 'Could not calculate /var/log/ size'" true "/var/log/ Directory Size"
+    
+    # Section 5: Process & Performance Information
+    print_header "5. PROCESS & PERFORMANCE INFORMATION"
+    
+    # 5.1 Process List and Statistics
+    print_subsection "5.1 Process List and Statistics"
+    run_command "ps auxf" false "Detailed Process List"
+    run_command "pstree -p -n" false "Process Tree"
+    run_command "ps -eo pid,ppid,user,pcpu,pmem,cmd --sort=-pcpu | head -n 15" false "Top CPU-consuming Processes"
+    run_command "ps -eo pid,ppid,user,pcpu,pmem,cmd --sort=-pmem | head -n 15" false "Top Memory-consuming Processes"
+    run_command "ps -eo pid,ppid,user,stat,start,cmd | head -n 15" false "Process Status and Start Time"
+    
+    # 5.2 Process Resource Usage
+    print_subsection "5.2 Process Resource Usage"
+    if command -v pidstat &> /dev/null; then
+        run_command "pidstat -dlrsu 1 3" false "Process Statistics (3 samples)"
+    else
+        echo "pidstat not available (part of sysstat package)"
+    fi
+    
+    run_command "lsof -i -P -n | head -n 20" true "Open Network Connections and Files (top 20)" || \
+        echo "lsof not available or requires elevated privileges"
+    
+    # 5.3 System Call Statistics
+    print_subsection "5.3 System Call Statistics"
+    if command -v strace &> /dev/null; then
+        run_command "strace -c -f -S name -p 1 2>&1 | head -n 20" true "System Calls by PID 1 (requires root)" || \
+            echo "strace not available or requires root privileges"
+    else
+        echo "strace not installed. Install with 'apt install strace' or 'yum install strace'"
+    fi
+    
+    # 5.4 Process Limits and Capabilities
+    print_subsection "5.4 Process Limits and Capabilities"
+    run_command "ulimit -a" false "Current User Process Limits"
+    
+    if command -v getcap &> /dev/null; then
+        run_command "getcap -r / 2>/dev/null | head -n 20" true "Files with Capabilities (top 20, requires root)" || \
+            echo "Could not list file capabilities (requires root)"
+    else
+        echo "getcap not available. Install with 'apt install libcap2-bin' or 'yum install libcap-ng-utils'"
+    fi
+    
+    # 5.5 System Performance Metrics
+    print_subsection "5.5 System Performance Metrics"
+    run_command "vmstat 1 3" false "Virtual Memory Statistics"
+    run_command "mpstat -P ALL 1 3" false "CPU Statistics (3 samples)" || \
+        echo "mpstat not available (part of sysstat package)"
+    run_command "iostat -xz 1 3" false "Extended I/O Statistics (3 samples)" || \
+        echo "iostat not available (part of sysstat package)"
+    
+    # 5.6 System Logs for Performance Issues
+    print_subsection "5.6 Performance-related System Logs"
+    if [ -f "/var/log/kern.log" ]; then
+        run_command "grep -i -E 'error|warn|fail|oom|throttl|latency|timeout' /var/log/kern.log | tail -n 20" true "Recent Kernel Log Entries"
+    elif [ -f "/var/log/messages" ]; then
+        run_command "grep -i -E 'error|warn|fail|oom|throttl|latency|timeout' /var/log/messages | tail -n 20" true "Recent System Messages"
+    fi
+    
+    # 5.7 Systemd Service Status
+    print_subsection "5.7 Systemd Service Status"
+    if command -v systemctl &> /dev/null; then
+        run_command "systemctl list-units --type=service --state=failed" false "Failed System Services"
+        run_command "systemctl list-timers --all" false "Systemd Timers"
+        run_command "systemd-analyze blame | head -n 10" true "Slowest Starting Services"
+        run_command "systemd-analyze critical-chain" true "Critical Startup Chain"
+    fi
+    
+    # 5.8 Process Environment
+    print_subsection "5.8 Process Environment"
+    run_command "env | sort" false "Current Environment Variables"
+    
+    # 5.9 System Resource Usage Summary
+    print_subsection "5.9 System Resource Usage Summary"
+    run_command "top -b -n 1 | head -n 20" false "System Resource Usage (top)"
+    
+    if command -v htop &> /dev/null; then
+        run_command "htop -n 1 | head -n 20" false "Interactive Process Viewer (htop)"
+    else
+        echo "htop not installed. Install with 'apt install htop' or 'yum install htop'"
+    fi
 }
 
 # Execute main function

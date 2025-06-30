@@ -87,22 +87,35 @@ install_dependencies() {
 # Function to download the script
 download_script() {
     local temp_file
-    temp_file=$(mktemp)
+    temp_file=$(mktemp 2>/dev/null || mktemp -t 'sysinfo')
+    
+    if [ -z "$temp_file" ] || [ ! -f "$temp_file" ]; then
+        print_message "${COLOR_RED}" "Failed to create temporary file"
+        return 1
+    fi
+    
+    # Clean up temp file on exit
+    trap 'rm -f "$temp_file"' EXIT
     
     print_message "${COLOR_BLUE}" "Downloading ${SCRIPT_NAME}..."
     
+    local download_success=false
+    
     if command_exists curl; then
-        if ! curl -sSL "$REPO_RAW_URL" -o "$temp_file"; then
-            print_message "${COLOR_RED}" "Failed to download ${SCRIPT_NAME} using curl"
-            return 1
+        if curl -sSL "$REPO_RAW_URL" -o "$temp_file" 2>/dev/null; then
+            download_success=true
         fi
     elif command_exists wget; then
-        if ! wget -q "$REPO_RAW_URL" -O "$temp_file"; then
-            print_message "${COLOR_RED}" "Failed to download ${SCRIPT_NAME} using wget"
-            return 1
+        if wget -q "$REPO_RAW_URL" -O "$temp_file" 2>/dev/null; then
+            download_success=true
         fi
     else
         print_message "${COLOR_RED}" "Neither curl nor wget is available. Please install one of them and try again."
+        return 1
+    fi
+    
+    if [ "$download_success" != true ]; then
+        print_message "${COLOR_RED}" "Failed to download ${SCRIPT_NAME}"
         return 1
     fi
     
@@ -118,25 +131,66 @@ download_script() {
         return 1
     fi
     
+    # Remove the trap as we're returning the temp file path
+    trap - EXIT
     echo "$temp_file"
     return 0
 }
 
 # Function to install the script
 install_script() {
-    local temp_file=$1
+    local temp_file="$1"
     
-    # Create target directory if it doesn't exist
-    mkdir -p "$INSTALL_DIR"
-    
-    # Install the script
-    if ! install -m 755 "$temp_file" "$INSTALL_PATH"; then
-        print_message "${COLOR_RED}" "Failed to install ${SCRIPT_NAME} to ${INSTALL_PATH}"
+    # Verify temp file exists and is readable
+    if [ ! -f "$temp_file" ] || [ ! -r "$temp_file" ]; then
+        print_message "${COLOR_RED}" "Temporary file not found or not readable"
         return 1
     fi
     
-    # Clean up
-    rm -f "$temp_file"
+    # Create target directory if it doesn't exist
+    mkdir -p "$INSTALL_DIR" 2>/dev/null || {
+        print_message "${COLOR_RED}" "Failed to create directory ${INSTALL_DIR}"
+        return 1
+    }
+    
+    # Check if we can write to the destination
+    if [ ! -w "$INSTALL_DIR" ] && [ "$(id -u)" -ne 0 ]; then
+        print_message "${COLOR_RED}" "No write permission to ${INSTALL_DIR}. Run with sudo."
+        return 1
+    fi
+    
+    # Create a backup if the file already exists
+    if [ -f "$INSTALL_PATH" ]; then
+        local backup_path="${INSTALL_PATH}.bak.$(date +%Y%m%d%H%M%S)"
+        print_message "${COLOR_YELLOW}" "Backing up existing file to ${backup_path}"
+        cp "$INSTALL_PATH" "$backup_path" 2>/dev/null || {
+            print_message "${COLOR_YELLOW}" "Warning: Could not create backup of existing file"
+        }
+    fi
+    
+    # Install the script
+    print_message "${COLOR_BLUE}" "Installing to ${INSTALL_PATH}"
+    
+    # Use cat instead of install for better error handling
+    if ! cat "$temp_file" > "$INSTALL_PATH"; then
+        print_message "${COLOR_RED}" "Failed to write to ${INSTALL_PATH}"
+        return 1
+    fi
+    
+    # Set executable permissions
+    if ! chmod 755 "$INSTALL_PATH"; then
+        print_message "${COLOR_RED}" "Failed to set executable permissions on ${INSTALL_PATH}"
+        return 1
+    fi
+    
+    # Verify the installed script
+    if [ ! -x "$INSTALL_PATH" ]; then
+        print_message "${COLOR_RED}" "Installed file is not executable"
+        return 1
+    fi
+    
+    # Clean up temp file
+    rm -f "$temp_file" 2>/dev/null || true
     
     return 0
 }

@@ -154,6 +154,77 @@ main() {
     else
         echo "lm-sensors package not installed. Install with 'apt install lm-sensors' or 'yum install lm_sensors'"
     fi
+    
+    # Section 2: Disk & Filesystem Information
+    print_header "2. DISK & FILESYSTEM INFORMATION"
+    
+    # 2.1 Disk Usage
+    print_subsection "2.1 Disk Usage"
+    run_command "df -hT -x tmpfs -x devtmpfs" false "Filesystem Disk Space Usage (human-readable)"
+    run_command "df -i -x tmpfs -x devtmpfs" false "Filesystem Inode Usage"
+    
+    # 2.2 Block Devices and Partitions
+    print_subsection "2.2 Block Devices and Partitions"
+    if command -v lsblk &> /dev/null; then
+        run_command "lsblk -o NAME,FSTYPE,SIZE,TYPE,MOUNTPOINT,UUID,PARTUUID,MODEL,SERIAL" false "Block Devices and Partitions"
+        run_command "lsblk -t" false "Block Devices Topology"
+    else
+        run_command "fdisk -l 2>/dev/null" true "Disk Partition Table (requires root)" || \
+            echo "fdisk not available or requires root privileges"
+    fi
+    
+    # 2.3 Mounted Filesystems
+    print_subsection "2.3 Mounted Filesystems"
+    run_command "mount | sort" false "Currently Mounted Filesystems"
+    run_command "cat /proc/mounts | sort" false "Mounted Filesystems (from /proc/mounts)"
+    
+    # 2.4 Filesystem Details
+    print_subsection "2.4 Filesystem Details"
+    if [ -f "/etc/fstab" ]; then
+        get_file_content "/etc/fstab"
+    else
+        echo "/etc/fstab not found"
+    fi
+    
+    # 2.5 LVM Information (if LVM is used)
+    print_subsection "2.5 LVM Information"
+    if command -v pvs &> /dev/null; then
+        run_command "pvs" true "Physical Volumes"
+        run_command "vgs" true "Volume Groups"
+        run_command "lvs" true "Logical Volumes"
+        run_command "pvdisplay" true "Physical Volume Details"
+        run_command "vgdisplay" true "Volume Group Details"
+        run_command "lvdisplay" true "Logical Volume Details"
+    else
+        echo "LVM tools not found. Install with 'apt install lvm2' or 'yum install lvm2'"
+    fi
+    
+    # 2.6 Disk I/O Statistics
+    print_subsection "2.6 Disk I/O Statistics"
+    if command -v iostat &> /dev/null; then
+        run_command "iostat -x 1 3" false "Extended I/O Statistics (3 samples)"
+    else
+        echo "iostat not available. Install with 'apt install sysstat' or 'yum install sysstat'"
+    fi
+    
+    # 2.7 Disk S.M.A.R.T. Status (if available)
+    print_subsection "2.7 Disk S.M.A.R.T. Status"
+    if command -v smartctl &> /dev/null; then
+        echo "Checking S.M.A.R.T. status for all disks (this may take a while)..."
+        for disk in $(lsblk -d -o NAME -n); do
+            if [ -e "/dev/${disk}" ] && [ "$(smartctl -i /dev/${disk} 2>&1 | grep -c 'Device supports SMART')" -gt 0 ]; then
+                run_command "smartctl -H /dev/${disk}" true "S.M.A.R.T. Health for /dev/${disk}"
+                run_command "smartctl -A /dev/${disk}" true "S.M.A.R.T. Attributes for /dev/${disk}"
+            fi
+        done
+    else
+        echo "smartmontools not installed. Install with 'apt install smartmontools' or 'yum install smartmontools'"
+    fi
+    
+    # 2.8 Disk Space Usage by Directory
+    print_subsection "2.8 Disk Space Usage by Directory"
+    run_command "du -h --max-depth=1 / 2>/dev/null | sort -hr" true "Disk Usage in / (top level directories)" || \
+        echo "Could not calculate disk usage (requires root for some directories)"
 }
 
 # Execute main function

@@ -221,11 +221,6 @@ main() {
         echo "smartmontools not installed. Install with 'apt install smartmontools' or 'yum install smartmontools'"
     fi
     
-    # 2.8 Disk Space Usage by Directory
-    print_subsection "2.8 Disk Space Usage by Directory"
-    run_command "du -h --max-depth=1 / 2>/dev/null | sort -hr" true "Disk Usage in / (top level directories)" || \
-        echo "Could not calculate disk usage (requires root for some directories)"
-    
     # Section 3: Network Information
     print_header "3. NETWORK INFORMATION"
     

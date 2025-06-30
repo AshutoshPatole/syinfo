@@ -361,6 +361,60 @@ main() {
     if [ -f "/proc/net/snmp" ]; then
         run_command "cat /proc/net/snmp" false "IP, ICMP, TCP, and UDP Statistics"
     fi
+    
+    # Section 4: System Performance & Resource Usage
+    print_header "4. SYSTEM PERFORMANCE & RESOURCE USAGE"
+    
+    # 4.1 System Load and CPU Usage
+    print_subsection "4.1 System Load and CPU Usage"
+    run_command "uptime" false "System Load Averages"
+    run_command "mpstat -P ALL 1 3" false "CPU Usage Statistics (3 samples)" || \
+        echo "sysstat package not installed. Install with 'apt install sysstat' or 'yum install sysstat'"
+    run_command "sar -u 1 3" false "CPU Utilization (3 samples)" || \
+        echo "sar command not available (part of sysstat package)"
+    run_command "top -b -n 1 | head -n 20" false "Top Processes by CPU Usage"
+    
+    # 4.2 Memory Usage and Analysis
+    print_subsection "4.2 Memory Usage and Analysis"
+    run_command "free -m" false "Memory Usage in MB"
+    run_command "vmstat 1 3" false "Virtual Memory Statistics (3 samples)"
+    run_command "slabtop -o -s c | head -n 20" true "Kernel SLAB/SLUB Info (top 20)" || \
+        echo "slabtop not available. Install with 'apt install procps' or 'yum install procps-ng'"
+    run_command "ps aux --sort=-%mem | head -n 10" false "Top 10 Processes by Memory Usage"
+    
+    # 4.3 Disk I/O Performance
+    print_subsection "4.3 Disk I/O Performance"
+    run_command "iostat -x 1 3" false "Extended I/O Statistics (3 samples)" || \
+        echo "iostat not available (part of sysstat package)"
+    run_command "iotop -o -b -n 1 | head -n 15" true "Top I/O Processes" || \
+        echo "iotop not installed. Install with 'apt install iotop' or 'yum install iotop'"
+    run_command "dmesg | grep -i 'error\|warn\|fail\|timeout\|dropped\|reject' | tail -n 20" true "Recent Kernel Errors/Warnings"
+    
+    # 4.4 Process and Resource Limits
+    print_subsection "4.4 Process and Resource Limits"
+    run_command "ulimit -a" false "Current User Process Limits"
+    run_command "ps -eo pid,ppid,user,%cpu,%mem,cmd --sort=-%cpu | head -n 15" false "Top CPU-consuming Processes"
+    run_command "ps -eo pid,ppid,user,%cpu,%mem,cmd --sort=-%mem | head -n 15" false "Top Memory-consuming Processes"
+    
+    # 4.5 System Logs and Messages
+    print_subsection "4.5 System Logs and Messages"
+    if [ -f "/var/log/syslog" ]; then
+        run_command "tail -n 50 /var/log/syslog" true "Recent System Logs"
+    elif [ -f "/var/log/messages" ]; then
+        run_command "tail -n 50 /var/log/messages" true "Recent System Messages"
+    fi
+    
+    if [ -f "/var/log/dmesg" ]; then
+        run_command "tail -n 30 /var/log/dmesg" true "Recent Kernel Messages"
+    else
+        run_command "dmesg | tail -n 30" true "Recent Kernel Messages (from dmesg)"
+    fi
+    
+    # 4.6 System Resource Usage Summary
+    print_subsection "4.6 System Resource Usage Summary"
+    run_command "ps -eo pcpu,pmem,pid,user,args | sort -k 1 -r | head -n 10" false "Top 10 Processes by CPU and Memory"
+    run_command "df -h" false "Filesystem Disk Space Usage"
+    run_command "du -sh /var/log/ 2>/dev/null || echo 'Could not calculate /var/log/ size'" true "/var/log/ Directory Size"
 }
 
 # Execute main function
